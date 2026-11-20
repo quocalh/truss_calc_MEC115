@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Activate Python Environment",
+            "type": "shell",
+            "command": "source .venv/bin/activate && echo 'Done activating virtual Python interpreter' && which python",
+            "options": {
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": []
+        }
+    ]
+}
