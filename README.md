@@ -13,8 +13,14 @@ given a drawn structure and couple of forces, analyze tensions
 20/11/26: done trusses
 - working toward computing frame and truss structures
 
+![testing phase](.md/2026-11-20_12-54-10_hyprshot.png)
+
+![early prototype](.md/image.png)
+
 # Notes
 No AI generated codes are used in this repo
 
 Ignore the .vscode and the venv folders
 Pygame coordinate is flipped (intuitively, that should not affect the tension force in each member)
+
+The code architecture decisions (except the solver) are mostly based on on-the-fly assumptions. This is not a healthy codebase.  
