@@ -31,13 +31,58 @@ based on relative distance
 we will extend it into frame later
     now only 2 force member
 
+to join two truss:
+    press ALT to inspect the closest?
+        nah press ALT to start do the linking
+
+    upon pressing ALT (or F)?, 
+        the MOUSE POS move to to the nearest member 
+        a frame linker will be created (holding the parent)
+
+        upon a left click, 
+            create a string frame issue (2)
+                save pt1, the parent truss (the closest one)
+
+            if string frame issued, 
+                if the parent member (the closest) is the same as the first node (1)
+                    destroy the link
+                frame add the support point (into the binding list)
+                    a support will be created
+                    the parent member (the closest) 
+                        turning into a frame
+            
+
+(1) ownership problem
+    add "parent_member" to the support
+        add and destroy using interface (on sync with the parent member)
+
+(2) we really have to?
+    just create that point
+        declare the relationship between the point and that frame 
+            (transform from truss to frame if needed to)
+
 """
    
 class Linker:
     def __init__(self, pt1: Support):
         self.pt1: Support = pt1
         self.pt2: Support = None
-        self.done = False
+
+    def render(self, surface: pg.surface.Surface, pos: list[float], color: pg.Color = "white"):
+        pg.draw.line(surface, color, self.pt1.point, pos, 2) 
+
+class FrameLinker(Linker):
+    def __init__(self, joint1: Support, member1: Member):
+        super().__init__(joint1)
+        self.member1: Member = member1
+        self.member2: Member = None
+
+    """
+    def render(self, surface: pg.surface.Surface, pos: list[float], color: pg.Color = "white"):
+        super().render(surface, pos, color)
+        self.pt1_parent.render(surface)
+        # self.pt2_parent.render(surface)
+    """
 
 WIDTH, HEIGHT = 800, 800
 screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -63,20 +108,20 @@ def get_closest_point(points: list[Support], anchor: Support) -> Support:
             closest = point
 
     if sqr_closest_dist > ISSUE_SENSITIVITY_SQR_DIST:
-        print(sqr_closest_dist)
         return None
 
     return closest
 
-
 supports: list[Support] = []
 members: list[Member] = []
 forces: list[Force] = []
+# frame_map: dict[str: Frame] = {}
 
 solver = Solver()
 
 string_issue_member: Linker = None
 string_issue_force: Linker = None
+string_issue_frame: Linker = None
 
 running = True
 while (running):
@@ -108,41 +153,30 @@ while (running):
                 running = False
 
             if (event.key == pg.K_RETURN):
-                print("solving...")
+                print("solving truss...")
                 solver.solve_truss(members, supports, forces)
+                print("solving frame...")
+                solver.solve_frame(members, supports, forces)
 
             key_comb = event.key 
             if ((key_comb == pg.K_LCTRL and key_comb == pg.K_s) or (key_comb == pg.K_s and key_comb == pg.K_LCTRL) ):
                 if (event.key == pg.K_s):
                     print("saving...")
-                
-
-
-    """
-    # feature: magnetic row col
-    if keys[K_LSHIFT] and string_issue_cur:
-        
-        relative = [string_issue_cur.pt1.point[0] - MOUSE_POS[0], string_issue_cur.pt1.point[1] - MOUSE_POS[1]]
-        if (abs(relative[0]) > abs(relative[1])): # x dominant
-            MOUSE_POS[0] = string_issue_cur.pt1.point[0]
-        else:
-            MOUSE_POS[1] = string_issue_cur.pt1.point[1]
-
-        pg.draw.line(screen, "green", string_issue_cur.pt1.point, MOUSE_POS)
-    """
 
     keys = pg.key.get_pressed()
+
     if keys[K_LSHIFT]:
         render_magnetic_grid(screen, WIDTH, HEIGHT)
-        magnetic = magnetic_mouse_pos_closest(
+        point = magnetic_mouse_pos_closest(
             MOUSE_POS, 
             WIDTH / X_GRID_DIVISOR, 
             HEIGHT / Y_GRID_DIVISOR
         )
-        pg.draw.circle(screen, "green", magnetic, 5)
-        MOUSE_POS = magnetic
+        pg.draw.circle(screen, "green", point, 5)
+        MOUSE_POS = point
 
-    if keys[K_p]:
+    # boss im tired
+    if keys[K_p] or keys[K_q]:
         if LEFT_CLICKED:
             supports.append(
                 Pin(MOUSE_POS)  
@@ -163,39 +197,141 @@ while (running):
     elif keys[K_f]:
         pass
 
-    elif keys[K_LCTRL]:
+    if keys[K_LCTRL]:
         for event in events:
             if event.type == KEYDOWN and event.key == K_s:
                 print("saved")
+
+    if keys[K_LALT]:
+        if (len(supports) < 2):
+            pass
+        else: 
+            # get the closest point, get the closest member
+            closest_member = None
+            closest_point = None
+            closest_dist = float("inf")
+
+            for member in members:
+                p1 = member.p1.point
+                p2 = member.p2.point
+
+                vector = vector2_relative(p1, MOUSE_POS)
+                base = vector2_relative(p1, p2)
+                base_dist = vector2_mag(base)
+                normalized_product = dot(base, vector) / base_dist / base_dist
+
+                if normalized_product > 1:
+                    dist = vector2_mag(vector2_relative(p2, MOUSE_POS)) 
+                    point = p2
+                elif normalized_product < 0:
+                    dist = vector2_mag(vector)
+                    point = p1
+                else:
+                    dist = abs(cross(vector, base)) / base_dist
+                    point = vector2_add(
+                        p1, vector2_scale(base, normalized_product)
+                    )
+
+                if (dist < closest_dist):
+                    closest_point = point
+                    closest_dist = dist
+                    closest_member = member
+
+            # if any member exists at all
+            if closest_point:
+                pg.draw.line(screen, "cyan", 
+                            closest_point, 
+                            MOUSE_POS, 5)
+
+                pg.draw.line(screen, "cyan", 
+                            closest_member.p1.point, 
+                            closest_member.p2.point, 5)
+
+                pg.draw.circle(screen, "yellow", closest_point, 10)
+
+                if LEFT_CLICKED:
+                    if len(supports) < 2:
+                        pass                
+                    else:
+                        joint = Joint(closest_point)
+
+                        if closest_member.type is COMPONENT_TYPE.TRUSS:
+                            closest_member = Truss.frame_transform(closest_member)
+
+                        # ownership declare
+                        closest_member.declare_ownership(joint)
+
+                        # append new support
+                        supports.append(joint)
+
+                    """
+                    elif string_issue_frame:
+
+                        # if same member parent -> cancel
+                        if string_issue_frame.member1 is closest_member:
+                            print("same parent member -> destroy frame linker")
+                            string_issue_frame = None
+
+                        else:
+
+                            supports.append(
+                                string_issue_frame.pt1
+                            )
+                            supports.append(
+                                string_issue_frame.pt2
+                            )
+
+                            frame = Frame(
+                                string_issue_frame.pt1, string_issue_frame.pt2 
+                            )
+                            members.append(
+                                frame
+                            )
+
+                            #   transform the member 
+                            #   from truss to frame
+                            #   from frame to frame
+
+                            # declare ownership
+                            Frame.declare_ownership
+
+                            
+
+                    else:
+                        if (closest_dist > ISSUE_SENSITIVITY_SQR_DIST):
+                            pass
+                        else:
+                            support = Joint(closest_point)
+                            string_issue_frame = FrameLinker(support, closest_member) 
+                    """
 
     if RIGHT_CLICKED:
         if len(supports) < 2:
             pass
 
         elif string_issue_member:
-            magnetic = get_closest_point(supports, MOUSE_POS)
-            if (not magnetic): pass
+            point = get_closest_point(supports, MOUSE_POS)
+            if (not point): pass
 
-            elif (magnetic is string_issue_member.pt1):
+            elif (point is string_issue_member.pt1):
                 print("can't link between it and itself, no? -> destroy link...")  
                 string_issue_member = None
 
             else:
-                string_issue_member.pt2 = magnetic
+                string_issue_member.pt2 = point
                 members.append(
-                    Member(
+                    Truss(
                         string_issue_member.pt1, 
                         string_issue_member.pt2, 
-                        COMPONENT_TYPE.TRUSS
                     )
                 ) 
                 string_issue_member = None
 
         else:
-            magnetic = get_closest_point(supports, MOUSE_POS)
-            if (not magnetic): pass
+            point = get_closest_point(supports, MOUSE_POS)
+            if (not point): pass
             else:
-                string_issue_member = Linker(magnetic)
+                string_issue_member = Linker(point)
 
     if MIDDLE_CLICKED:
         if len(supports) < 1:
@@ -219,17 +355,36 @@ while (running):
             string_issue_force = None
 
         else:
-            magnetic = get_closest_point(supports, MOUSE_POS)
-            if (not magnetic): pass
+            point = get_closest_point(supports, MOUSE_POS)
+            if (not point): pass
             else:
-                string_issue_force = Linker(magnetic)
+                string_issue_force = Linker(point)
 
+                """
+                # if is owned then the force is belonged to the member
+                if (point.owning_member is not None):
+                    owner = point.owning_member
+                    if (owner.type == COMPONENT_TYPE.FRAME):
+                        pass
+                    else:
+                        print("who are you")
+                        assert(0)
+                """
+
+    """
+    if string_issue_frame:
+        pg.draw.circle(screen, "red", 
+                       string_issue_frame.pt1.point, 5)
+
+        p1 = string_issue_frame.pt1.point
+        pg.draw.line(screen, "cyan", p1, MOUSE_POS, 2)
+    """
 
     for point in supports:
         point.render(screen)
 
-    for bone in members:
-        pg.draw.line(screen, "white", bone.p1.point, bone.p2.point, 2)
+    for member in members:
+        member.render(screen)
 
     for force in forces:
         force.render(screen)

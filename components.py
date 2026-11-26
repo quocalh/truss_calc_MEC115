@@ -43,6 +43,7 @@ class Support(Component):
         super().__init__(type)
         self.name: str = get_alpha_name()
         self.point: list[float] = point
+        self.owning_member: Member = None
 
     def render(self, surface: pg.surface.Surface):
         print("not yet implemented")
@@ -122,7 +123,8 @@ class Force(Component):
 
     @staticmethod
     def evaluate_strength(relative: list[float, float]):
-        return  relative[0] * relative[0] + relative[1] * relative[1] 
+        # return  relative[0] * relative[0] + relative[1] * relative[1] 
+        return vector2_mag(relative)
 
     def render(self, surface: pg.surface.Surface):
         pg.draw.line(surface, "magenta", self.support.point, self.graphical_tip, 2)
@@ -155,20 +157,47 @@ class Member(Component):
         self.p1: Support = p1
         self.p2: Support = p2
         self.name = self.get_member_name()
+        self.unit: list[float, float] = None
 
     def get_member_name(self):
         if (len(self.p1.name) + len(self.p2.name) == 2):
             return self.p1.name + self.p2.name
         return self.p1.name + "_" + self.p2.name
-            
+
+    def render(self, surface: pg.surface.Surface):
+        print("not yet implemented")
+        assert(False)
 
 class Truss(Member):
     def __init__(self, p1: Support, p2: Support):
         super().__init__(p1, p2, COMPONENT_TYPE.TRUSS)
-        self.unit: list[float, float] = None
         self.tension: float = 0
+
+    @staticmethod
+    def frame_transform(truss)->Frame:
+        # frame = Frame(truss.p1, truss.p2)
+        # Frame.__init__(truss, truss.p1, truss.p2)
+        truss.__class__ = Frame
+        Frame.__init__(truss, truss.p1, truss.p2)
+        return truss
+
+    def render(self, surface: pg.surface.Surface):
+        pg.draw.line(surface, "white", self.p1.point, self.p2.point, 2)
 
 class Frame(Member):
     def __init__(self, p1: Support, p2: Support):
         super().__init__(p1, p2, COMPONENT_TYPE.FRAME)
-        self.binds: list[float, Member] = []
+        self.binds: list[Support] = []
+
+    def render(self, surface: pg.surface.Surface):
+        pg.draw.line(surface, "cyan", self.p1.point, self.p2.point, 2)
+
+    def declare_ownership(self, joint1: Support):
+        self.binds.append(joint1)
+        """
+        print(self.name)
+        print(self.binds, joint1.name)
+        print([bind.name for bind in self.binds])
+        print()
+        """
+        joint1.owning_member = self

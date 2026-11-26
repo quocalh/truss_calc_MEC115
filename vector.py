@@ -22,3 +22,8 @@ def vector2_unit(v: list[float, float]):
     l = vector2_mag(v) 
     return [v[0] / l, v[1] / l]
 
+def dot(a: list[float], b: list[float]):
+    return a[0] * b[0] + a[1] * b[1]
+
+def cross(a: list[float], b: list[float]):
+    return a[0] * b[1] - a[1] * b[0]
